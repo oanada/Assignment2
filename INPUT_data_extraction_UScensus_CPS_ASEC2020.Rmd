@@ -1,0 +1,146 @@
+---
+title: "Extraction of March 2020 US census data on population ocupation and income "
+author: "Group A - Autumn Class:  Junylou Daniel, Oana Damian, Robin Mathew, Torsten Meyer"
+date: '01 November 2020'
+url: https://archive.ics.uci.edu/ml/datasets/Adult
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+
+### About 
+
+Extraction of US census data from the Current Population Survey (CPS), Annual Social and Economic (ASEC) Supplement as at March 2020
+
+The data is made available by the US Census Bureau <https://www.census.gov/data/datasets/time-series/demo/cps/cps-asec.2020.html>
+
+Data description: <file:///C:/Users_Folders/YORK_MLcertificate/Assignment2/asecpub20csv/ASEC2020ddl_pub_full_fields_description.pdf>
+
+Data dource: <https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip>
+
+To run the extraction code download the following 3 files on your local machine:
+
+files 1 & 2 unzip csv files "hhpub20.csv" and "pphub20.csv"  from  <https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip>
+
+file 3 "INPUT_variables_map.csv" from  <https://github.com/oanada/Assignment2>
+
+The result of the data extraction is uploaded and available for download as "US_Census_2020.csv" in the public repository <https://github.com/oanada/Assignment2>
+
+
+```{r, message = FALSE}
+## pls. download and unzip csv files "hhpub20.csv" and "pphub20.csv"  from  https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip
+## pls download "INPUT_variables_map.csv" from  https://github.com/oanada/Assignment2
+
+
+# Pls input below the local folder where the three files ("hhpub20.csv", "pphub20.csv", "INPUT_variables_map.csv") have been downloaded
+# The processed data extraction will be saved in the same folder
+
+INPUT_local_folder="C:/Users_Folders/YORK_MLcertificate/Assignment2/asecpub20csv/"
+
+
+### read variables mapping
+### ===================================================
+INPUT_varmap=read.csv(paste0(INPUT_local_folder,"INPUT_variables_map.csv"), header = TRUE)
+
+
+### Load persons data 
+### ===================================================
+
+INPUT_pp_retained_fields=      c('PERIDNUM','PH_SEQ', 'A_FNLWGT', 'A_AGE',    'A_CLSWKR',  'A_HGA',     'A_MARITL',       'A_PFREL',       'PRDTRACE', 'PENATVTY',       'A_MJOCC',      'A_USLHRS',       'WSAL_VAL'   ,   'CAP_VAL' ,'A_SEX','A_HSCOL')
+INPUT_pp_retained_fields_names=c('PERIDNUM','H_SEQ',  'fnlwgt',   'age',      'workclass', 'education', 'marital_status', 'relationship',  'race',     'native_country', 'occupation',   'hours_per_week', 'Wages_n_salary', 'capital_gains','sex','School_enrolment')
+INPUT_pp_fields_labeled=c('PENATVTY','PRDTRACE','A_PFREL','A_MARITL','A_HGA','A_CLSWKR','A_MJOCC','A_SEX','A_HSCOL')
+
+
+INPUT_pp=read.csv(paste0(INPUT_local_folder,"pppub20.csv"), header = TRUE)
+# WSAL_VAL - total wage and salary earnings (combined amounts in ern-val, if  ern-srce=1, and ws-val)
+
+
+#A_USLHRS= How many hrs per week does ... usually work at this job? Universe: All Persons
+# Values: -4 = Hours vary
+# -1 = Not in universe
+# 00 = None, no hours
+# 01-99 = Entry
+
+
+
+# retain only a subset of available fields
+INPUT_pp=INPUT_pp[,INPUT_pp_retained_fields]
+
+
+# remove children
+INPUT_pp=INPUT_pp[!(INPUT_pp$A_HGA==0 & INPUT_pp$A_AGE<=16),]
+
+
+# remove ppl who have no occupation or are children A_MJOCC 
+INPUT_pp=INPUT_pp[!(INPUT_pp$A_MJOCC==0),]
+
+# remove ppl who have A_FNLWGT=0 
+INPUT_pp=INPUT_pp[!(INPUT_pp$A_FNLWGT==0),]
+
+
+# replace variable values with the labels
+for(idx_var in 1:length(INPUT_pp_fields_labeled))
+{ TEMP_varmap=INPUT_varmap[(INPUT_varmap[,1]==INPUT_pp_fields_labeled[idx_var]),c(2,4)]
+  colnames(TEMP_varmap)=c(INPUT_pp_fields_labeled[idx_var],'Label')
+  INPUT_pp<- merge(x = INPUT_pp, y = TEMP_varmap, by = INPUT_pp_fields_labeled[idx_var], all.x = TRUE)
+  INPUT_pp[,c(INPUT_pp_fields_labeled[idx_var])]=INPUT_pp$Label
+  INPUT_pp = INPUT_pp[,!(names(INPUT_pp) %in% c("Label"))]
+  
+}
+
+
+# rename headers
+for(idx_var in 1:length(INPUT_pp_retained_fields))
+{colnames(INPUT_pp)[colnames(INPUT_pp) == INPUT_pp_retained_fields[idx_var]] <- INPUT_pp_retained_fields_names[idx_var]
+}
+
+
+
+
+### Load households data
+### ===================================================
+
+INPUT_hh_retained_fields=      c('H_SEQ', 'GEDIV',  'GESTFIPS','GTCBSASZ')
+INPUT_hh_retained_fields_names=c('H_SEQ', 'region', 'state',   'metropoly_size')
+INPUT_hh_fields_labeled=      c( 'GEDIV',  'GESTFIPS','GTCBSASZ')
+
+INPUT_hh=read.csv(paste0(INPUT_local_folder,"hhpub20.csv"), header = TRUE)
+
+INPUT_hh=INPUT_hh[,INPUT_hh_retained_fields]
+
+# replace variable values with the labels
+for(idx_var in 1:length(INPUT_hh_fields_labeled))
+{ TEMP_varmap=INPUT_varmap[(INPUT_varmap[,1]==INPUT_hh_fields_labeled[idx_var]),c(2,4)]
+  colnames(TEMP_varmap)=c(INPUT_hh_fields_labeled[idx_var],'Label')
+  INPUT_hh=merge(x = INPUT_hh, y = TEMP_varmap, by = INPUT_hh_fields_labeled[idx_var], all.x = TRUE)
+  INPUT_hh[,c(INPUT_hh_fields_labeled[idx_var])]=INPUT_hh$Label
+  INPUT_hh = INPUT_hh[,!(names(INPUT_hh) %in% c("Label"))]
+  
+}
+
+
+# rename headers
+for(idx_var in 1:length(INPUT_hh_retained_fields))
+{colnames(INPUT_hh)[colnames(INPUT_hh) == INPUT_hh_retained_fields[idx_var]] <- INPUT_hh_retained_fields_names[idx_var]
+}
+
+
+
+
+### join household geographical data with people data
+### ===================================================
+INPUT_pp_hh<- merge(x = INPUT_pp, y = INPUT_hh, by = "H_SEQ", all.x = TRUE)
+write.csv(INPUT_pp_hh, paste0(INPUT_local_folder,"US_Census_2020.csv"))
+
+```
+
+
