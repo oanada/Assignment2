@@ -1,0 +1,230 @@
+---
+title: "Extraction of March 2020 US census data on population ocupation and income "
+author: "Group A - Autumn Class:  Junylou Daniel, Oana Damian, Robin Mathew, Torsten Meyer"
+date: '01 November 2020'
+url: https://archive.ics.uci.edu/ml/datasets/Adult
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+
+
+
+### About 
+
+Extraction of US census data from the Current Population Survey (CPS), Annual Social and Economic (ASEC) Supplement as at March 2020
+
+The data is made available by the US Census Bureau <https://www.census.gov/data/datasets/time-series/demo/cps/cps-asec.2020.html>
+
+Data description: <file:///C:/Users_Folders/YORK_MLcertificate/Assignment2/asecpub20csv/ASEC2020ddl_pub_full_fields_description.pdf>
+
+Data dource: <https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip>
+
+To run the extraction code download the following 3 files on your local machine:
+
+files 1 & 2 unzip csv files "hhpub20.csv" and "pphub20.csv"  from  <https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip>
+
+file 3 "INPUT_variables_map.csv" from  <https://github.com/oanada/Assignment2>
+
+The result of the data extraction is uploaded and available for download as "US_Census_2020.csv" in the public repository <https://github.com/oanada/Assignment2>
+
+
+```{r, message = FALSE}
+## pls. download and unzip csv files "hhpub20.csv" and "pphub20.csv"  from  https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip
+## pls download "INPUT_variables_map.csv" from  https://github.com/oanada/Assignment2
+
+
+# Pls input below the local folder where the three files ("hhpub20.csv", "pphub20.csv", "INPUT_variables_map.csv") have been downloaded
+# The processed data extraction will be saved in the same folder
+
+INPUT_local_folder="C:/Users_Folders/YORK_MLcertificate/Assignment2/asecpub20csv/"
+
+
+### read variables mapping
+### ===================================================
+INPUT_varmap=read.csv(paste0(INPUT_local_folder,"INPUT_variables_map.csv"), header = TRUE)
+
+
+### Load persons data 
+### ===================================================
+
+INPUT_pp_retained_fields=      c('PERIDNUM','PH_SEQ', 'A_FNLWGT', 'A_AGE',    'A_CLSWKR',  'A_HGA',     'A_MARITL',       'A_PFREL',       'PRDTRACE', 'PENATVTY',       'A_MJOCC',      'A_USLHRS',       'WSAL_VAL'   ,   'CAP_VAL' ,'A_SEX','A_HSCOL')
+INPUT_pp_retained_fields_names=c('PERIDNUM','H_SEQ',  'fnlwgt',   'age',      'workclass', 'education', 'marital_status', 'relationship',  'race',     'native_country', 'occupation',   'hours_per_week', 'Wages_n_salary', 'capital_gains','sex','School_enrolment')
+INPUT_pp_fields_labeled=c('PENATVTY','PRDTRACE','A_PFREL','A_MARITL','A_HGA','A_CLSWKR','A_MJOCC','A_SEX','A_HSCOL')
+
+
+INPUT_pp=read.csv(paste0(INPUT_local_folder,"pppub20.csv"), header = TRUE)
+# WSAL_VAL - total wage and salary earnings (combined amounts in ern-val, if  ern-srce=1, and ws-val)
+
+
+#A_USLHRS= How many hrs per week does ... usually work at this job? Universe: All Persons
+# Values: -4 = Hours vary
+# -1 = Not in universe
+# 00 = None, no hours
+# 01-99 = Entry
+
+
+
+# retain only a subset of available fields
+INPUT_pp=INPUT_pp[,INPUT_pp_retained_fields]
+
+
+# remove children
+INPUT_pp=INPUT_pp[!(INPUT_pp$A_HGA==0 ),]
+INPUT_pp=INPUT_pp[!(INPUT_pp$A_AGE<=16),]
+
+# remove ppl who have no occupation or are children A_MJOCC 
+INPUT_pp=INPUT_pp[!(INPUT_pp$A_MJOCC==0),]
+
+# remove ppl who have A_FNLWGT=0 
+INPUT_pp=INPUT_pp[!(INPUT_pp$A_FNLWGT==0),]
+
+
+# replace variable values with the labels
+for(idx_var in 1:length(INPUT_pp_fields_labeled))
+{ TEMP_varmap=INPUT_varmap[(INPUT_varmap[,1]==INPUT_pp_fields_labeled[idx_var]),c(2,4)]
+  colnames(TEMP_varmap)=c(INPUT_pp_fields_labeled[idx_var],'Label')
+  INPUT_pp<- merge(x = INPUT_pp, y = TEMP_varmap, by = INPUT_pp_fields_labeled[idx_var], all.x = TRUE)
+  INPUT_pp[,c(INPUT_pp_fields_labeled[idx_var])]=INPUT_pp$Label
+  INPUT_pp = INPUT_pp[,!(names(INPUT_pp) %in% c("Label"))]
+  
+}
+
+
+# rename headers
+for(idx_var in 1:length(INPUT_pp_retained_fields))
+{colnames(INPUT_pp)[colnames(INPUT_pp) == INPUT_pp_retained_fields[idx_var]] <- INPUT_pp_retained_fields_names[idx_var]
+}
+
+
+
+
+### Load households data
+### ===================================================
+
+INPUT_hh_retained_fields=      c('H_SEQ', 'GEDIV',  'GESTFIPS','GTCBSASZ')
+INPUT_hh_retained_fields_names=c('H_SEQ', 'region', 'state',   'metropoly_size')
+INPUT_hh_fields_labeled=      c( 'GEDIV',  'GESTFIPS','GTCBSASZ')
+
+INPUT_hh=read.csv(paste0(INPUT_local_folder,"hhpub20.csv"), header = TRUE)
+
+INPUT_hh=INPUT_hh[,INPUT_hh_retained_fields]
+
+# replace variable values with the labels
+for(idx_var in 1:length(INPUT_hh_fields_labeled))
+{ TEMP_varmap=INPUT_varmap[(INPUT_varmap[,1]==INPUT_hh_fields_labeled[idx_var]),c(2,4)]
+  colnames(TEMP_varmap)=c(INPUT_hh_fields_labeled[idx_var],'Label')
+  INPUT_hh=merge(x = INPUT_hh, y = TEMP_varmap, by = INPUT_hh_fields_labeled[idx_var], all.x = TRUE)
+  INPUT_hh[,c(INPUT_hh_fields_labeled[idx_var])]=INPUT_hh$Label
+  INPUT_hh = INPUT_hh[,!(names(INPUT_hh) %in% c("Label"))]
+  
+}
+
+
+# rename headers
+for(idx_var in 1:length(INPUT_hh_retained_fields))
+{colnames(INPUT_hh)[colnames(INPUT_hh) == INPUT_hh_retained_fields[idx_var]] <- INPUT_hh_retained_fields_names[idx_var]
+}
+
+
+
+
+### join household geographical data with people data
+### ===================================================
+INPUT_pp_hh<- merge(x = INPUT_pp, y = INPUT_hh, by = "H_SEQ", all.x = TRUE)
+
+INPUT_pp_hh$Wages_n_salary_bins_50K<-ifelse(INPUT_pp_hh$Wages_n_salary<=5*10^5,"<=50K",">50K");
+
+INPUT_pp_hh$Wages_n_salary_bins<-case_when(
+  INPUT_pp_hh$Wages_n_salary <=10*10^3 ~  "(   0-10K]",
+  INPUT_pp_hh$Wages_n_salary <=25*10^3 ~  "(  10-25K]",
+  INPUT_pp_hh$Wages_n_salary <=50*10^3 ~  "(  25-50K]",
+  INPUT_pp_hh$Wages_n_salary <=70*10^3 ~  "(  50-70K]",
+  INPUT_pp_hh$Wages_n_salary <=100*10^3 ~ "(  70-100K]",
+  INPUT_pp_hh$Wages_n_salary <=150*10^3 ~ "( 100-150K]",
+  INPUT_pp_hh$Wages_n_salary <=200*10^3 ~ "( 150-200K]",
+  INPUT_pp_hh$Wages_n_salary <=300*10^3 ~ "( 200-300K]",
+  INPUT_pp_hh$Wages_n_salary <=360*10^3 ~ "( 300-360K]",
+  INPUT_pp_hh$Wages_n_salary <=500*10^3 ~ "( 360-500K]",
+  INPUT_pp_hh$Wages_n_salary <=1000*10^3 ~"( 500-1000K]",
+  INPUT_pp_hh$Wages_n_salary >1000*10^3 ~ "(1000K+",
+)
+
+
+INPUT_pp_hh$Wages_n_salary_bins_incometax<-case_when(
+  INPUT_pp_hh$Wages_n_salary <=10*10^3 ~  "(  0-10K]",
+  INPUT_pp_hh$Wages_n_salary <=40*10^3 ~  "( 10-40K]",
+  INPUT_pp_hh$Wages_n_salary <=85*10^3 ~  "( 40-85K]",
+  INPUT_pp_hh$Wages_n_salary <=160*10^3 ~ "( 85-160K]",
+  INPUT_pp_hh$Wages_n_salary <=205*10^3 ~ "(160-205K]",
+  INPUT_pp_hh$Wages_n_salary <=510*10^3 ~ "(205-360K]",
+  INPUT_pp_hh$Wages_n_salary  >510*10^3 ~ "(510K+",
+)
+
+INPUT_pp_hh$age_bins<-case_when(
+  INPUT_pp_hh$age <=18 ~ "(16-18]",
+  INPUT_pp_hh$age <=22 ~ "(18-22]",
+  INPUT_pp_hh$age <=25 ~ "(20-25]",
+  INPUT_pp_hh$age <=30 ~ "(24-30]",
+  INPUT_pp_hh$age <=35 ~ "(30-35]", 
+  INPUT_pp_hh$age <=40 ~ "(35-40]", 
+  INPUT_pp_hh$age <=45 ~ "(40-45]",
+  INPUT_pp_hh$age <=50 ~ "(45-50]",
+  INPUT_pp_hh$age <=55 ~ "(50-55]",
+  INPUT_pp_hh$age <=60 ~ "(55-60]",
+  INPUT_pp_hh$age <=65 ~ "(60-65]",
+  INPUT_pp_hh$age <=70 ~ "(65-70]",
+  INPUT_pp_hh$age <=75 ~ "(70-75]",
+  INPUT_pp_hh$age >75  ~ "(75+]",
+)
+
+INPUT_pp_hh$capital_gains_bins<-case_when(
+  INPUT_pp_hh$capital_gains <=0 ~        "   0",
+  INPUT_pp_hh$capital_gains <=10*10^3 ~  "(  0-10K]",
+  INPUT_pp_hh$capital_gains <=40*10^3 ~  "( 20-40K]",
+  INPUT_pp_hh$capital_gains <=85*10^3 ~  "( 40-85K]",
+  INPUT_pp_hh$capital_gains <=200*10^3 ~ "( 85-200K]",
+  INPUT_pp_hh$capital_gains <=400*10^3 ~ "(200-400K]",
+  INPUT_pp_hh$capital_gains >400*10^3 ~  "(400k+",
+)
+
+INPUT_pp_hh$capital_gains_bins<-case_when(
+  INPUT_pp_hh$capital_gains <=0 ~        "   0",
+  INPUT_pp_hh$capital_gains <=85*10^3 ~  "(  0-85K]",
+  INPUT_pp_hh$capital_gains <=100*10^3 ~ "( 85-100K]",
+  INPUT_pp_hh$capital_gains <=200*10^3 ~ "(100-200K]",
+  INPUT_pp_hh$capital_gains <=400*10^3 ~ "(200-400K]",
+  INPUT_pp_hh$capital_gains >400*10^3 ~  "(400k+",
+)
+
+
+
+INPUT_pp_hh$hours_per_week_bins<-case_when(
+  INPUT_pp_hh$hours_per_week <=-4 ~   " Variable",
+  INPUT_pp_hh$hours_per_week <=-1 ~   "  NIU",
+  INPUT_pp_hh$hours_per_week <=0 ~    " 0",
+  INPUT_pp_hh$hours_per_week <=15 ~   "(0-15h]",
+  INPUT_pp_hh$hours_per_week <=20~   "(15-20h]",
+  INPUT_pp_hh$hours_per_week <=25~   "(20-25h]",
+  INPUT_pp_hh$hours_per_week <=30~   "(25-30h]",
+  INPUT_pp_hh$hours_per_week <=35~   "(30-35h]",
+  INPUT_pp_hh$hours_per_week <=40~   "(35-40h]",
+  INPUT_pp_hh$hours_per_week <=45~   "(40-45h]",
+  INPUT_pp_hh$hours_per_week <=50~   "(45-50h]",
+  INPUT_pp_hh$hours_per_week <=55~   "(50-55h]",
+  INPUT_pp_hh$hours_per_week <=60~   "(55-60h]",
+  INPUT_pp_hh$hours_per_week >60~   "(60h+",
+)
+
+write.csv(INPUT_pp_hh, paste0(INPUT_local_folder,"US_Census_2020.csv"))
+
+```
+
+
