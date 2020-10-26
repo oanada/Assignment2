@@ -1,0 +1,280 @@
+---
+title: "Exploring the Census Income Dataset"
+author: "Group A - Autumn Class:  Junylou Daniel, Oana Damian, Robin Mathew, Torsten Meyer"
+date: '01 November 2020'
+url: https://archive.ics.uci.edu/ml/datasets/Adult
+output: html_document 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+## Business case
+
+A well known US retail bank has an annual process for reviewing new potential sources of data and assessing their potential to augmenting it's data and business intelligence capabilities . 
+This year, among other sources of data, the data science team has the mandate of exploring US census data and potentially integrating it with existing customer data.
+
+Before effectively assessing how the US census data and it's features can enhance existing bank process, the data science team had been tasked with exploring the data and presenting their findings. 
+Management expressed an interest in:
+
+1. understanding  customers income determinants
+2. profiling potential customers
+3. understanding if there are large geographical imbalances in the potential customer base
+4. understanding if teh data poses andy potential ethical issues related to the presence of race information
+
+Management expectations were anchored to a well known 1994 US census dataset (<https://archive.ics.uci.edu/ml/datasets/Adult>) that has been cited and used to assess the determinants of personal income.
+
+As such, the data science team has integrated both management requests and the features present in 1994 US census dataset to build a more recent dataset based on the latest US census data. 
+On addition to teh 1994 US census data the team also included geographical data that locates the 
+
+
+## Data Analysis
+
+### Data description
+The data is extracted from the Current Population Survey (CPS), Annual Social and Economic (ASEC) Supplement conducted by the Bureau of the Census for the Bureau of Labor Statistics. the CPS-ASEC Supplement covers labor force data and supplemental data on work experience, income, noncash benefits, and migration.
+"The CPS is the source of the official Government statistics on employment and unemployment."(<https://www2.census.gov/programs-surveys/cps/techdocs/cpsmar20.pdf>) 
+Currently, the CPS interviews approximately 54,000 households on a monthly basis, sampled from the civilian noninstitutional population of the US in approximately 1,328 counties and cities.
+
+
+The survey data covers separately households, families and persons.
+
+For households,in addition to demographic and economic data, the data also includes geographical location features.
+
+For persons, the survey covers work experience information, employment status, occupation,industry, weeks worked and hours per week worked, reason for not working full time, total income and income components. Data on employment and income is based on the preceding year, while demographic data reflects teh status at the time of the survey.Members of the armed forces are included in the ASEC if at least one civilian adult lives in the same household.\
+
+
+The survey material is made available by the US Census Bureau for teh month of March 2020 at: <https://www.census.gov/data/datasets/time-series/demo/cps/cps-asec.html>
+
+The US Census Bureau provides a detailed data description file : <file:///C:/Users_Folders/YORK_MLcertificate/Assignment2/asecpub20csv/ASEC2020ddl_pub_full_fields_description.pdf>
+
+The US census data files for March 2020 are available at: <https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip>\\\
+
+
+### Data features extracted from the 2020 ASEC Supplement
+
+Compared to the 1994 sample, we were able to add geographical data to the features:
+
+
+
+Variable Name     |   Description
+------------------|---------------------------
+age               |   continuous.
+work class        |   NIU/children/Armed Forces Private, Self-emp-not-inc, Self-emp-inc, Federal-gov, Local-gov, State-gov, Without-pay, Never-worked.
+fnlwgt            |   weight used to produce population estimates - it reflects the probability of a person being selected for the survey, adjusted for special sampling situations and failure to obtain interviews from eligible households.
+education         |   Bachelors, Some-college,  HS-grad, Prof-school, Assoc-acdm, Assoc-voc, 9th, 7th-8th, 11th, 12th, Masters, 1st-4th, 10th, Doctorate, 5th-6th, Preschool.
+marital status    |   Married-civ-spouse, Divorced, Never-married, Separated, Widowed, Married-spouse-absent,             Married-AF-spouse.
+occupation        |   1)Management, business, financial,  2)Professional and related,   3)Service,   4)Sales and related,   5)Office-admin support,   6) Farming, fishing, forestry,  7)Construction, extraction,  8)Installation, maintenance, repair,  9) Production,  10) Transportation, material moving,  11) Armed Forces
+relationship      |   Wife, Husband, Own-child, Not-in-family, Other-relative, Unmarried.
+race              |   White only, Black only,  Hawaiian/Pacific Islander only,  American Indian/Alaskan Native only, Asian only, Black & Other, White & Other, Other 2 races, Other 3+ races
+gender            |   Female, Male.
+native country    |   given the numerous categories (approximately 150 countries), the countries available were grouped based on cultural proximity, following Mensah Chen(2013). US, China, Mexico and India remain separate categories since they have a relatively large presence.
+capital gain      |   continuous.
+hours per week    |   -4(hours vary), 0-99 hours per week.
+wages & salary    |   numerical
+metropolis size   |   NIU/non-metropolitan,  100,000-249,999,  250,000-499,999,  500,000-999,999,   1,000,000-2,499,999,  2,500,000-4,999,999,  5,000,000+
+state             |   the 52 US states
+region            |   New England,  Middle Atlantic,  East North Central, West North Central, South Atlantic, East South Central, West South Central, Mountain Pacific
+NIU - not in universe
+
+
+
+
+### Descriptive statistics
+
+```{r, message = FALSE, out.width="100%",fig.fullwidth=TRUE, fig.align='center',fig.asp = .6}
+
+### clear workspace
+rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+#gc(verbose=FALSE) #free up memory and report the memory usage.
+
+library(naniar)
+library(RColorBrewer)
+library(dplyr)
+library(readr)
+library(caTools)
+library(corrplot)
+library(ggpubr)
+library(ggplot2)
+library(gridExtra)
+library(cluster)
+library(fpc)
+library(purrr)
+library(dendextend)
+library(data.table)
+
+mainPalette = brewer.pal(20,"YlGnBu")
+
+### read files
+# pls. download locally the csv from  https://github.com/oanada/Assignment2/blob/main/US_Census_2020.csv
+
+INPUT_local_folder="C:/Users_Folders/YORK_MLcertificate/Assignment2/asecpub20csv/"
+
+censusdf<-read.csv(paste0(INPUT_local_folder,"US_Census_2020.csv"), header = TRUE);
+
+                   # Var 1                # var2               # var1nice name    # var2 nice name   # comments
+INPUT_vars_all<-c("age_bins",             "Wages_n_salary_bins",  "Age"         ,"Income"         ,"comment",
+                  "Wages_n_salary_bins",  "sex"                ,  "Income"      ,"Gender"         ,"comment",
+                  "education",            "sex"                ,  "Education"   ,"Gender"         ,"comment",              
+                  "education",            "Wages_n_salary_bins",  "Education"   ,"Income"         ,"comment")              
+INPUT_vars_all<-matrix(INPUT_vars_all,ncol=5,byrow=TRUE)
+
+for(idx_var in 1:nrow(INPUT_vars_all))
+{ print(INPUT_vars_all[idx_var,5])
+  
+  censusdf$VAR_TGT1<-censusdf[,INPUT_vars_all[idx_var,1]]
+  censusdf$VAR_TGT2<-censusdf[,INPUT_vars_all[idx_var,2]]
+  
+  p1 <- ggplot(censusdf, aes(x=VAR_TGT1)) + geom_bar(aes(fill=VAR_TGT2), width = 0.5)+
+       theme(axis.text.x=element_text(angle=90),text = element_text(size=8),plot.title = element_text(size=9))+ 
+       labs(fill=INPUT_vars_all[idx_var,4], y="Number of persons",x=INPUT_vars_all[idx_var,3], title=paste0("No persons by ",INPUT_vars_all[idx_var,3]," & ",INPUT_vars_all[idx_var,4]))
+
+p11 <- ggplot(censusdf, aes(x=VAR_TGT1, fill = VAR_TGT2)) +
+        geom_bar(position = "fill", width = 0.5) +
+        stat_count(position=position_fill(vjust=0.5))+
+        theme(axis.text.x=element_text(angle=90),text = element_text(size=8), plot.title = element_text(size=9))+ 
+        scale_y_continuous(labels=scales::percent)+
+        labs(fill=INPUT_vars_all[idx_var,4], x=INPUT_vars_all[idx_var,3], y="%",title=paste0(INPUT_vars_all[idx_var,4], " distribution by ", INPUT_vars_all[idx_var,3]))
+
+  #plot(p1)
+  #plot(p11)
+  grid.arrange( p1, p11, ncol = 2)
+  
+}  
+
+
+
+```
+
+
+## Data exploration
+
+### Profile clusterings
+```{r, message = FALSE, out.width="100%", fig.fullwidth=TRUE, fig.align='center', fig.asp = .4}
+
+INPUT_model_variables<-c('sex', 'workclass', "education", "marital_status", "relationship", "race", "metropoly_size", "state", "Wages_n_salary_bins", "age_bins", "hours_per_week_bins")
+INPUT_var_names_4_outputs<-c('Gender','Sector',"Education","Marital status", "Relationship", "Race", "Metropoly size", "State", "Income", "Age", "Hours per week ")
+
+  df<-censusdf[,(names(censusdf) %in% INPUT_model_variables)]
+  df[sapply(df, is.character)] <- lapply(df[sapply(df, is.character)], as.factor)
+  df[sapply(df, is.factor)] <- lapply(df[sapply(df, is.factor)], as.integer)
+  
+  dt<-setDT(df)
+  scaled_dt<-scale(dt)
+  
+  pop_cluster<-kmeans(scaled_dt,4,nstart=50)
+  pca<-prcomp(scaled_dt, scale = FALSE)
+  pca_scaled_dt <- predict(pca, newdata = scaled_dt)
+  
+  cluster_pca_scaled_dt <- cbind(pca_scaled_dt, cluster = pop_cluster$cluster)
+  cluster_pca_scaled_df <- as.data.frame(cluster_pca_scaled_dt)
+  
+  cluster_raw_df <- cbind(censusdf, cluster = pop_cluster$cluster)
+  
+  final_df <- cbind(censusdf,PC1=cluster_pca_scaled_df$PC1,PC2=cluster_pca_scaled_df$PC2,cluster=cluster_pca_scaled_df$cluster)
+  final_df<-select(final_df,-fnlwgt)
+
+  
+  pc1_model<-lm(PC1 ~.,select(final_df,-PC2,-cluster))
+  pc2_model<-lm(PC2 ~.,select(final_df,-PC1,-cluster))
+  
+  final_plot_df<-cluster_pca_scaled_df
+  final_plot_df$cluster[final_plot_df$cluster==1]<-'1'
+  final_plot_df$cluster[final_plot_df$cluster==2]<-'2'
+  final_plot_df$cluster[final_plot_df$cluster==3]<-'3'
+  final_plot_df$cluster[final_plot_df$cluster==4]<-'4'
+  final_plot_df$cluster <- factor(final_plot_df$cluster, levels = c('1','2','3','4'))
+  
+  ggObj1<- ggplot(final_plot_df, aes(PC1,PC2))+
+    geom_point(aes(color = as.factor(cluster)),size=1) +
+    labs(color="Customer Type") +
+    guides(color = guide_legend(override.aes = list(size = 3)))
+  
+  ggObj2<- ggplot(final_df, aes(Wages_n_salary_bins,sex))+
+    geom_point(aes(color = as.factor(cluster)),size=1) +
+    labs(color="Customer Type") +
+    guides(color = guide_legend(override.aes = list(size = 3)))
+  
+  
+for(idx_var in 1:length(INPUT_model_variables))
+{ final_df$VAR_TGT<-final_df[,INPUT_model_variables[idx_var]]
+
+  p1 <- ggplot(final_df, aes(x=VAR_TGT)) + geom_bar(aes(fill=as.factor(cluster)), width = 0.5)+
+       theme(axis.text.x=element_text(angle=90),text = element_text(size=8), plot.title = element_text(size=9))+ 
+       labs(fill="Cluster", y="Number of persons",x=INPUT_var_names_4_outputs[idx_var], title=paste0("No persons by Cluster and ",INPUT_var_names_4_outputs[idx_var]))
+
+p11 <- ggplot(final_df, aes(x=VAR_TGT, fill = as.factor(cluster))) +
+        geom_bar(position = "fill", width = 0.5) +
+        stat_count(position=position_fill(vjust=0.5))+
+        theme(axis.text.x=element_text(angle=90),text = element_text(size=8), plot.title = element_text(size=9))+ 
+        scale_y_continuous(labels=scales::percent)+
+        labs(fill="Cluster", x=INPUT_var_names_4_outputs[idx_var], title=paste0("Cluster distribution by ", INPUT_var_names_4_outputs[idx_var]))
+
+  #plot(p1)
+  #plot(p11)
+  grid.arrange( p1, p11, ncol = 2)
+}   
+
+  
+  p14 <- ggplot(final_df, aes(x=education, y=hours_per_week)) + geom_point(aes(col=cluster, size=cluster)) + geom_smooth(method="loess", se=F) + 
+          labs(subtitle="Salary Vs Hours per Week", y="Hours per Week", x="Salary", title="Scatterplot") + theme(axis.text.x=element_text(angle=90))
+  
+```
+
+```{r, message = FALSE, out.width="100%", fig.fullwidth=TRUE, fig.align='center', fig.asp = 1}
+ggplot(final_df, aes(x=education, y=hours_per_week_bins)) + geom_point(aes(col=as.factor(cluster),shape=as.factor(cluster), size=as.factor(cluster)))+
+          scale_shape_manual(values=c(16, 16, 15,15,11))+
+          scale_color_manual(values=c("black", "grey64", "dodgerblue","red","green"))+
+          scale_size_manual(values=c(2,4,6,10,12))
+          labs( y="Hours per Week", x="Salary", title="Salary Vs Hours per Week") +
+          theme(axis.text.x=element_text(angle=90))
+          
+ ggplot(final_df)+ geom_step(aes(x = education, linetype  = as.factor(cluster)),geom = "step")+
+ theme(axis.text.x=element_text(angle=90))+
+ scale_color_manual(values=c("black", "grey64", "dodgerblue","red","green"))
+```     
+
+```{r, message = FALSE, out.width="100%", fig.fullwidth=TRUE, fig.align='center'}
+print("Distribution of Education and Hours worked, by Cluster,")
+p11<-ggplot(final_df[final_df$cluster==1,], aes(x=education,  y=hours_per_week_bins) ) +
+  geom_bin2d()+theme(axis.text.x=element_text(angle=90),text = element_text(size=8), axis.title.x=element_blank(),axis.title.y=element_blank())+
+  scale_fill_gradient(limits=c(1,sum(final_df$cluster==1)/3),low = "white", high = "#161977",na.value = NA,trans="sqrt")
+
+
+p12<-ggplot(final_df[final_df$cluster==2,], aes(x=education,  y=hours_per_week_bins) ) +
+  geom_bin2d()+theme(axis.text.x=element_text(angle=90),text = element_text(size=8), axis.title.x=element_blank(),axis.title.y=element_blank())+
+  scale_fill_gradient(limits=c(1,sum(final_df$cluster==2)/3),low = "white", high = "#161977",na.value = NA,trans="log2")
+  
+p13<-ggplot(final_df[final_df$cluster==3,], aes(x=education,  y=hours_per_week_bins) ) +
+  geom_bin2d()+theme(axis.text.x=element_text(angle=90),text = element_text(size=8), axis.title.x=element_blank(),axis.title.y=element_blank())+
+  scale_fill_gradient(limits=c(1,sum(final_df$cluster==3)/3),low = "white", high = "#161977",na.value = NA,trans="sqrt")
+
+p14<-ggplot(final_df[final_df$cluster==4,], aes(x=education,  y=hours_per_week_bins) ) +
+  geom_bin2d()+
+  theme(axis.text.x=element_text(angle=90),text = element_text(size=8), axis.title.x=element_blank(),axis.title.y=element_blank())+
+  scale_fill_gradient(limits=c(1,sum(final_df$cluster==4)/3),low = "white", high = "#161977",na.value = NA,trans="sqrt")
+  
+  grid.arrange( p11, p12,p13, p14, ncol = 2,nrow = 2)  
+  
+```     
+  
+
+
+
+
+### Income determinants
+
+### Regional similarity
+
+### Race
+
+
+
+## References
+Mensah Yaw M., Hsiao-Yin Chen, 2013,"Global Clustering of Countries by Culture – An Extension of the GLOBE Study" <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2189904>
+
+
+Kohav Ron , 1996, "Scaling Up the Accuracy of Naive-Bayes Classifiers: a Decision-Tree Hybrid", Proceedings of the Second International Conference on Knowledge Discovery and Data Mining, 
