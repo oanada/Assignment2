@@ -1,0 +1,546 @@
+---
+title: "Exploring the Census Income Dataset"
+author: 'Group A - Autumn Class:  Junylou Daniel, Oana Damian, Robin Mathew, Torsten
+  Meyer'
+date: "01 November 2020"
+output:
+  html_document: default
+  word_document: default
+url: https://archive.ics.uci.edu/ml/datasets/Adult
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+## Business case
+
+A well known US retail bank has an annual process for reviewing new sources of data and assessing their potential to augmenting it's data and business intelligence capabilities. Also, the bank aims at developing methods for clustering potential new customers into several groups for the purpose of offering different types of credit cards (e.g. Platinum, Gold, Silver, Bronze).
+This year, among other sources of data, the data science team has the mandate of exploring US census data, potentially integrating it with existing customer data, and generating a shiny app that illustrates the clustering of existing, and potential customers.
+
+Before effectively assessing how the US census data and its features can enhance existing bank process, the data science team had been tasked with exploring the data and presenting their findings. 
+Management expressed an interest in:
+
+1. understanding  customers income determinants
+2. profiling potential customers
+3. developing a platform (shiny app) with which new and existing customers can be grouped in terms of various types of credit card offers
+4. understanding if the data poses any potential ethical issues related to the presence of race and gender information
+
+Management expectations were anchored to a well known 1994 US census dataset (<https://archive.ics.uci.edu/ml/datasets/Adult>) that has been cited and used to assess the determinants of personal income.
+
+As such, the data science team has integrated both management requests and the features present in 1994 US census dataset to build a more recent dataset based on the latest US census data. 
+On addition to the 1994 US census data the team also included geographical data that locates the customers in term of state.
+
+
+## Data Analysis
+
+### Data description
+The data is extracted from the Current Population Survey (CPS), Annual Social and Economic (ASEC) Supplement conducted by the Bureau of the Census for the Bureau of Labor Statistics. The CPS-ASEC Supplement covers labor force data and supplemental data on work experience, income, noncash benefits, and migration.
+"The CPS is the source of the official Government statistics on employment and unemployment."(<https://www2.census.gov/programs-surveys/cps/techdocs/cpsmar20.pdf>) 
+Currently, the CPS interviews approximately 54,000 households on a monthly basis, sampled from the civilian non-institutional population of the US in approximately 1,328 counties and cities.
+
+
+The survey data covers separately households, families and persons.
+
+For households, in addition to demographic and economic data, the data also includes geographical location features.
+
+For persons, the survey covers work experience information, employment status, occupation, industry, weeks worked and hours per week worked, reason for not working full time, total income and income components. Data on employment and income is based on the preceding year, while demographic data reflects the status at the time of the survey. Members of the armed forces are included in the ASEC if at least one civilian adult lives in the same household.
+
+
+The survey material is made available by the US Census Bureau for the month of March 2020 at: <https://www.census.gov/data/datasets/time-series/demo/cps/cps-asec.html>
+
+The US Census Bureau provides a detailed data description file : <file:///C:/Users_Folders/YORK_MLcertificate/Assignment2/asecpub20csv/ASEC2020ddl_pub_full_fields_description.pdf>
+
+The US census data files for March 2020 are available at: <https://www2.census.gov/programs-surveys/cps/datasets/2020/march/asecpub20csv.zip>\\\
+
+
+### Data features extracted from the 2020 ASEC Supplement
+
+Compared to the 1994 sample, we were able to add geographical data to the features:
+
+
+
+Variable Name     |   Description
+------------------|---------------------------
+age               |   continuous.
+work class        |   NIU/children/Armed Forces Private, Self-emp-not-inc, Self-emp-inc, Federal-gov, Local-gov, State-gov, Without-pay, Never-worked.
+fnlwgt            |   weight used to produce population estimates - it reflects the probability of a person being selected for the survey, adjusted for special sampling situations and failure to obtain interviews from eligible households.
+education         |   Bachelors, Some-college,  HS-grad, Prof-school, Assoc-acdm, Assoc-voc, 9th, 7th-8th, 11th, 12th, Masters, 1st-4th, 10th, Doctorate, 5th-6th, Preschool.
+marital status    |   Married-civ-spouse, Divorced, Never-married, Separated, Widowed, Married-spouse-absent,             Married-AF-spouse.
+occupation        |   1)Management, business, financial,  2)Professional and related,   3)Service,   4)Sales and related,   5)Office-admin support,   6) Farming, fishing, forestry,  7)Construction, extraction,  8)Installation, maintenance, repair,  9) Production,  10) Transportation, material moving,  11) Armed Forces
+relationship      |   Wife, Husband, Own-child, Not-in-family, Other-relative, Unmarried.
+race              |   White only, Black only,  Hawaiian/Pacific Islander only,  American Indian/Alaskan Native only, Asian only, Black & Other, White & Other, Other 2 races, Other 3+ races
+gender            |   Female, Male.
+native country    |   given the numerous categories (approximately 150 countries), the countries available were grouped based on cultural proximity, following Mensah Chen(2013). US, China, Mexico and India remain separate categories since they have a relatively large presence.
+capital gain      |   continuous.
+hours per week    |   -4(hours vary), 0-99 hours per week.
+wages & salary    |   numerical
+metropolis size   |   NIU/non-metropolitan,  100,000-249,999,  250,000-499,999,  500,000-999,999,   1,000,000-2,499,999,  2,500,000-4,999,999,  5,000,000+
+state             |   the 52 US states
+School enrolment  |   flags if a person is enrolled in school in the moment of the survey
+
+
+
+Similar to the 1994 US census adult population extract, the March 2020 data excludes children (US Census fields A_HGA~=0  and A_AGE>16), it excludes persons who have no occupation or are children (US Census field  A_MJOCC~=0) and persons who have an assigned population weight of zero (US Census field A_FNLWGT~=0)
+
+
+
+### Descriptive statistics
+
+```{r, message = FALSE, out.width="100%",fig.fullwidth=TRUE, fig.align='center',fig.asp = .6}
+### clear workspace
+rm(list = ls(all.names = TRUE)) #will clear all objects includes hidden objects.
+memory.limit(size=50000)
+#gc(verbose=FALSE) #free up memory and report the memory usage.
+library(naniar)
+library(RColorBrewer)
+library(dplyr)
+library(readr)
+library(caTools)
+library(corrplot)
+library(ggpubr)
+library(ggplot2)
+library(gridExtra)
+library(cluster)
+library(fpc)
+library(purrr)
+library(dendextend)
+library(data.table)
+mainPalette = brewer.pal(20,"YlGnBu")
+### read files
+# pls. download locally the csv from  https://github.com/oanada/Assignment2/blob/main/US_Census_2020.csv
+INPUT_file_path="US_Census_2020.csv"
+#INPUT_file_path="https://raw.githubusercontent.com/oanada/Assignment2/main/US_Census_2020.csv"
+censusdf<-read.csv(INPUT_file_path, header = TRUE) 
+censusdf$region_state<-paste(censusdf$region,censusdf$state)
+censusdf$workclass_occupation <-paste(censusdf$occupation,censusdf$workclass)
+                   # Var 1                # var2               # var1nice name    # var2 nice name   # comments
+INPUT_vars_all<-c( "workclass",             "Wages_n_salary_bins",  "Sector"     ,    "Income"         ,"Both work sector and ocupation have an impact on the distribution of the level of income.",
+                   "occupation",            "Wages_n_salary_bins",  "Occupation" ,    "Income"         ,"",
+                   "workclass",            "occupation",            "Sector"     ,    "Occupation"     ,"",  
+                   
+                   "age_bins",             "Wages_n_salary_bins",  "Age"         ,    "Income"         ,"Age has a clear impact on the income distribution. Between 36y and 55y age groups,  income distribution seems similar but from ages 16 to 35  and from ages 56 onawrd the dictribution of income changes significantly from one age group to teh next",
+                  
+                  "Wages_n_salary_bins",  "sex"                ,  "Income"      ,    "Gender"         ,"A clear pattern emerges for the distribution of income across gender types - of the persons generating an annual income above 100K, there is a clear more frequent presence of men vs women, peakng at the (200k-300k] brachet where men are 75% of the observed sample population",
+                  
+                   "workclass",             "sex",  "Sector"     ,    "sex"         ,"The propoportion of men to women is significantly dependednt on the sector of activity. We remark the high ptpoportion of women  relative to men in teh non-pay category.",
+                   "occupation",            "sex",  "Occupation" ,    "sex"         ,"The propoportion of men to women is significantly dependednt on the ocupation, with office admin. jobs dominated by women and construction and maintenance dominated by men.",
+                  
+                   "education",            "sex"                ,  "Education"   ,    "Gender"         ,"Contrary to the distribution of income, women tend to advance more towards finishing high school(approx 67% of persons that have attended only preschool are men while aproximatelly 50% of the person who had some collefe or bachelors are men).", 
+                  
+                  "education",            "Wages_n_salary_bins",  "Education"   ,    "Income"         ,"In the distribution of income, as expected, higher education is correlated with higher income. Interestingly, the income distribution for persons with a PhD and persons with a professional school seem quite similar.",  
+                  
+                  "race",            "education",                 "Race"   ,         "Education"          ,"A clear difference between ",
+                  "race",            "Wages_n_salary_bins",       "Race"   ,         "Income"             ,"A clear difference between ",
+                  
+                  "native_country",  "education",                 "Native country culture"   ,         "Education"      ,"The native culture has a significant impact on the distribution of education.",  
+                  "native_country",  "Wages_n_salary_bins",       "Native country culture"   ,         "Income"         ,"The native culture has a significant impact on the distribution of income.",  
+                  
+                  "Wages_n_salary_bins",      "metropoly_size",   "Income",          "Metropoly size"    ,"The pattern in the distribution of income by type of metropole is as expected, the larger the metropole, the icome distribution tends to move towards higher income brackets",
+                  "region",  "Wages_n_salary_bins",                "Region"    ,"Income",          "We observe that East South central, Mountain, West North central and West South central tend to have a distribution shifted to lower income.",
+                  "state",  "Wages_n_salary_bins",                "State"    ,"Income",           "Aligned with the region observation, one can observe that there are potentially important disparities in the distribution of income across states." 
+                  
+                  )  
+INPUT_vars_all<-matrix(INPUT_vars_all,ncol=5,byrow=TRUE)
+INPUT_colors_categories=c( "#A50026",  "#F46D43", "#FDAE61", "#FEE090",  "#ABD9E9", "#74ADD1", "#4575B4" ,"#313695","#7FBC41" ,"#E0F3F8", "#BF812D","#D73027", "#FFFFBF", "#8C510A")
+for(idx_var in 1:nrow(INPUT_vars_all))
+{ print(INPUT_vars_all[idx_var,5])
+  
+  censusdf$VAR_TGT1<-censusdf[,INPUT_vars_all[idx_var,1]]
+  censusdf$VAR_TGT2<-censusdf[,INPUT_vars_all[idx_var,2]]
+  
+  p1 <- ggplot(censusdf, aes(x=VAR_TGT1)) + geom_bar(aes(fill=VAR_TGT2), width = 0.5)+
+       theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(size=8),plot.title = element_text(size=9))+ 
+       labs(fill=INPUT_vars_all[idx_var,4], y="Number of persons",x=INPUT_vars_all[idx_var,3], title=paste0("No persons by ",INPUT_vars_all[idx_var,3]," & ",INPUT_vars_all[idx_var,4]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+p11 <- ggplot(censusdf, aes(x=VAR_TGT1, fill = VAR_TGT2)) +
+        geom_bar(position = "fill", width = 0.5) +
+        stat_count(position=position_fill(vjust=0.5))+
+        theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(size=8), plot.title = element_text(size=9))+ 
+        scale_y_continuous(labels=scales::percent)+
+        labs(fill=INPUT_vars_all[idx_var,4], x=INPUT_vars_all[idx_var,3], y="%",title=paste0(INPUT_vars_all[idx_var,4], " distribution by ", INPUT_vars_all[idx_var,3]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+  #plot(p1)
+  #plot(p11)
+  grid.arrange( p1, p11, ncol = 2)
+  
+}  
+```
+
+
+## Data exploration
+
+The features available are a collection opf numerical and categorical variables. 
+For clustering, various methods exist, more or less adapted to categorical variables.
+We explore the following 3 algorithms:
+*.* K-means
+*.* K-medoids or PAM clustering
+*.* Agglomerative Hierarchical Clustering
+
+### Profile clusterings with K-means
+"K-means clustering is a method of vector quantization, originally from signal processing, that aims to partition the available observations into K clusters in which each observation belongs to the cluster with the nearest mean (cluster centers or cluster centroid), serving as a prototype of the cluster"(Source:<https://en.wikipedia.org/wiki/K-means_clustering>).
+The method is applicable to observations characterized by numerical variables and is sensitive to the relative scale of the variables as well as outliers.
+
+The method is not adapted well to categorical variables as it needs simplifying assumptions related to the scale and order of importance of the categories of each feature/variable, and the importance of each feature/variable relative to any other feature.
+
+
+To be able to explore the method for learning purposes, we have employed those assumptions:  
+
+i) assigned a random order(1 to n) to the categories of each feature/variable and assumed that each category is equally different from the next and
+
+ii) each feature is considered to be equally important which made us scale the features/variables to have a variance of 1
+
+The results for the method are generated extremely fast(less than 1 min) for the 52,000 observations and 15 features we have explored.
+
+The K-means algorithm optimizes for the cluster centers given a certain number of clusters. To select an optimal number of clusters, the Within groups sum of squares (WSS) graph is usually used (as the number pf clusters increases, the WSS decreases at a smaller and smaller pace) coupled with business intuition (too many clusters may not be easily interpretable).
+
+We employed a preliminary version of K-means where certain variables are binned, income, capital gains, age, hours per week.  (Please see graphs below).  The results are very similar.
+
+```{r, message = FALSE, out.width="100%", fig.fullwidth=TRUE, fig.align='center', fig.asp = .4}
+  
+INPUT_model_vars<-c('workclass',       "sector",  
+                    "occupation",      "Occupation",
+                    "education",       "Education",
+                    "age_bins",        "Age",
+                    "marital_status",  "Marital status",
+                    "relationship",    "Relationship",
+                    'sex',             'Gender',
+                    "native_country",  "Native Culture", 
+                    "race",            "Race", 
+                    "metropoly_size",  "Metropoly size", 
+                    "state",           "State", 
+                    "Wages_n_salary_bins",  "Income", 
+                    "capital_gains_bins",   "Capital gains", 
+                    "hours_per_week_bins",  "Hours per week")
+INPUT_model_vars<-matrix(INPUT_model_vars,ncol=2,byrow=TRUE)
+  df<-censusdf[,(names(censusdf) %in% INPUT_model_vars[,1])]
+  df[sapply(df, is.character)] <- lapply(df[sapply(df, is.character)], as.factor)
+  df[sapply(df, is.factor)] <- lapply(df[sapply(df, is.factor)], as.integer)
+  
+  dt<-setDT(df)
+  scaled_dt<-scale(dt)
+  
+  
+  # Function to compute total within-cluster sum of square
+  wssplot <- function(data, nc=15, seed=1234)
+    {  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+    for (i in 2:nc){
+      set.seed(seed)
+      wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+    p1=plot(1:nc, wss, type="b", xlab="No. of Clusters", ylab="Within groups sum of squares(WSS)",main="K-means within groups sum of squares by cluster number")
+  }
+   
+  # plotting values for each cluster starting from 1 to 9
+  wssplot(scaled_dt, nc = 25)
+  
+  
+  
+  pop_cluster<-kmeans(scaled_dt,centers = 4,iter.max = 20,nstart=50)
+  pca<-prcomp(scaled_dt, scale = FALSE)
+  pca_scaled_dt <- predict(pca, newdata = scaled_dt)
+  
+  cluster_pca_scaled_dt <- cbind(pca_scaled_dt, cluster = pop_cluster$cluster)
+  cluster_pca_scaled_df <- as.data.frame(cluster_pca_scaled_dt)
+  
+  cluster_raw_df <- cbind(censusdf, cluster = pop_cluster$cluster)
+  
+  final_df <- cbind(censusdf,PC1=cluster_pca_scaled_df$PC1,PC2=cluster_pca_scaled_df$PC2,cluster=cluster_pca_scaled_df$cluster)
+  final_df<-select(final_df,-fnlwgt)
+  
+  pc1_model<-lm(PC1 ~.,select(final_df,-PC2,-cluster))
+  pc2_model<-lm(PC2 ~.,select(final_df,-PC1,-cluster))
+  
+  final_plot_df<-cluster_pca_scaled_df
+  final_plot_df$cluster[final_plot_df$cluster==1]<-'1'
+  final_plot_df$cluster[final_plot_df$cluster==2]<-'2'
+  final_plot_df$cluster[final_plot_df$cluster==3]<-'3'
+  final_plot_df$cluster[final_plot_df$cluster==4]<-'4'
+  final_plot_df$cluster <- factor(final_plot_df$cluster, levels = c('1','2','3','4'))
+  
+  ggObj1<- ggplot(final_plot_df, aes(PC1,PC2))+
+    geom_point(aes(color = as.factor(cluster)),size=1) +
+    guides(color = guide_legend(override.aes = list(size = 3)))+
+    scale_colour_manual(values =INPUT_colors_categories)+
+    labs(color="Cluster",fill="Cluster", x='PC1 - first features combination that explain most the dispersion in the data ',y='PC2-second features combination',   title="Cluster distribution by first two PC - Pricipal Components")
+    
+  plot(ggObj1)
+  
+for(idx_var in 1:length(INPUT_model_vars[,1]))
+{ final_df$VAR_TGT<-final_df[,INPUT_model_vars[idx_var,1]]
+  p1 <- ggplot(final_df, aes(x=VAR_TGT)) + geom_bar(aes(fill=as.factor(cluster)), width = 0.5)+
+       theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(hjust=0.5, size=8), plot.title = element_text(size=9))+ 
+       labs( fill="Cluster", y="Number of persons",x=INPUT_model_vars[idx_var,2], title=paste0("No persons by Cluster and ",INPUT_model_vars[idx_var,2]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+p11 <- ggplot(final_df, aes(x=VAR_TGT, fill = as.factor(cluster))) +
+        geom_bar(position = "fill", width = 0.5) +
+        stat_count(position=position_fill(vjust=0.5))+
+        theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(hjust=0.5, size=8), plot.title = element_text(size=9))+ 
+        scale_y_continuous(labels=scales::percent)+
+        labs(fill="Cluster", x=INPUT_model_vars[idx_var,2], title=paste0("Cluster distribution by ", INPUT_model_vars[idx_var,2]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+  #plot(p1)
+  #plot(p11)
+  grid.arrange( p1, p11, ncol = 2)
+}   
+  
+```
+
+
+
+```{r, message=FALSE}
+```
+
+#### Dissimilarity matrix
+
+Before we start clustering our data points, we need to calculate the dissimilarity (or similarity) matrix first.  Since our variables include continuous and categorical, we will use Gower distance.  We will also check our dissimilarity matrix by looking at the most similar (nearest) and most dissimilar (farthest) pair of the data.
+
+```{r echo=FALSE, message=FALSE, warnings=FALSE }
+set.seed(987)
+library(naniar)
+library(RColorBrewer)
+library(dplyr)
+library(readr)
+library(caTools)
+library(corrplot)
+library(ggpubr)
+library(ggplot2)
+library(gridExtra)
+library(cluster)
+library(fpc)
+library(purrr)
+library(dendextend)
+library(data.table)
+library(Rtsne)
+library(FactoMineR)
+library(factoextra)
+library(cowplot)
+library(flashClust)
+df<-censusdf[,(names(censusdf) %in% INPUT_model_vars[,1])]
+df[sapply(df, is.character)] <- lapply(df[sapply(df, is.character)], as.factor)
+df1 <- df[sample(nrow(df),5000),]
+D=daisy(df1, metric='gower')
+gowermatrix <- as.matrix(D)
+# Output most similar pair
+print("Most similar pair")
+df1[which(gowermatrix == min(gowermatrix[gowermatrix != min(gowermatrix)]), arr.ind = TRUE)[1, ], ]
+# Output most dissimilar pair
+print("Most dissimilar pair")
+df1[which(gowermatrix == max(gowermatrix[gowermatrix != max(gowermatrix)]), arr.ind = TRUE)[1, ], ]
+```
+
+
+### Profile clusterings with PAM clustering and t-SNE visualization
+
+The k-medoids method is a clustering technique for partitioning the instances of a dataset into k groups. Each cluster is represented by a medoid, which essentially is one data point that represents the whole cluster. This approach is somewhat related to k-means clustering, however, instead of calculating the mean value, the k-medoids method minimizes the average dissimilarity between the medoid and all the other instances within a cluster. Therefore, k-medoid clustering is more robust and less sensitive to noise and outliers. 
+
+The method requires the number of clusters to be specified prior to the calculation. An often applied method to determine the optimal number of clusters is the silhouette method, where the largest width refers to the best discriminability of the dataset into clusters.
+
+The most commonly used algorithm for implementing k-medoids is PAM (Partitioning Around Medoids) (Kaufman and Rousseeuw 1990).
+
+The PAM algorithm calculates a matrix of dissimilarity, using the Euclidean distance for numeric variables, the Manhattan distance for categorical variables, or the Gower distance for mixed datasets (numerical and categorical variables). 
+
+
+A common method to visualize datasets with many features is t-SNE (T-Distributed Stochastic Neighboring Entities). This non-linear, probabilistic algorithm can project a high-dimensional dataset into a 2-dimensional map. The method often generates better discriminable clusters than PCA, however a key drawback is that it is much more computationally intensive than PCA.
+
+
+Therefore, given the large data set and our time constraints, for now, for illustrative purposes, we apply the PAM method to a subset of the data available to illustrate the method's criteria for choosing the optimal numbers of clusters and to illustrate approaches for visualizing the outputs.
+
+```{r echo=FALSE, message=FALSE, warnings=FALSE,out.width="100%", fig.fullwidth=TRUE, fig.align='center', fig.asp = .4}
+sil_width <- c(NA)
+for(i in 2:10){  
+  pam_fit <- pam(D, diss = TRUE, k = i)  
+  sil_width[i] <- pam_fit$silinfo$avg.width  
+}
+plot(1:10, sil_width, 
+          xlab = "Number of clusters",
+          ylab = "Silhouette Width")
+lines(1:10, sil_width)
+k <- 4
+pam_fit <- pam(D, diss = TRUE, k)
+pam_results <- df1 %>%
+  mutate(cluster = pam_fit$clustering) %>%
+  group_by(cluster) %>%
+  do(the_summary = summary(.))
+tsne_obj <- Rtsne(D, is_distance = TRUE)
+tsne_data <- tsne_obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering))
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))+
+  scale_colour_manual(values =INPUT_colors_categories)
+df1_out_pam<-df1
+df1_out_pam$cluster<-pam_fit$clustering
+  
+print('Clusters analysis')
+for(idx_var in 1:length(INPUT_model_vars[,1]))
+{ df1_out_pam$VAR_TGT<-df1_out_pam[,INPUT_model_vars[idx_var,1]]
+  p1 <- ggplot(df1_out_pam, aes(x=VAR_TGT)) + geom_bar(aes(fill=as.factor(cluster)), width = 0.5)+
+       theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(hjust=0.5, size=8), plot.title = element_text(size=9))+ 
+       labs( fill="Cluster", y="Number of persons",x=INPUT_model_vars[idx_var,2], title=paste0("No persons by Cluster and ",INPUT_model_vars[idx_var,2]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+p11 <- ggplot(df1_out_pam, aes(x=VAR_TGT, fill = as.factor(cluster))) +
+        geom_bar(position = "fill", width = 0.5) +
+        stat_count(position=position_fill(vjust=0.5))+
+        theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(hjust=0.5, size=8), plot.title = element_text(size=9))+ 
+        scale_y_continuous(labels=scales::percent)+
+        labs(fill="Cluster", x=INPUT_model_vars[idx_var,2], title=paste0("Cluster distribution by ", INPUT_model_vars[idx_var,2]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+  #plot(p1)
+  #plot(p11)
+  grid.arrange( p1, p11, ncol = 2)
+}
+#pam_results$the_summary
+```
+#### PAM Clustering Observations
+
+The Silhouette method indicated four as an optimal number of clusters. The following is a brief characterization of each of the clusters:
+
+Cluster 1: The cluster is mostly composed of middle aged (40-50 years old), married females. It contains the majority of instances related to the very high income bracket (>1,000k), as well as high capital gains (>200k). Interestingly, cluster 1 comprises virtually all instances related to a work load of zero hours per week.
+
+Cluster 2: This cluster is mostly composed of self-employed (Inc.), relatively older, and married males. The cluster represents the largest fraction in the income bracket 200k-500k, and the associated persons tend to work more than 40h per week.
+
+Cluster 3: The cluster comprises virtually all instances related to no salary ("without pay"), and represents the largest fraction associated with preschool education. Persons in this cluster tend to be young (<35 years old), single males, and living preferably in larger cities (metropoly size > 5M).
+
+Cluster 4: Persons associated with this cluster tend to be young, non-married, females, with a somewhat lower than average education. The cluster represents the largest fraction in the income bracket 10-25k, and the associated persons tend to work part-time (>0 to 35 hours per week).
+
+
+
+### Profile clusterings with Agglomerative Hierarchical Clustering
+
+Hierarchical Clustering Analysis(HAC) is "a method of cluster analysis which seeks to build a hierarchy of clusters. Strategies for hierarchical clustering generally fall into two types:
+
+Agglomerative: This is a "bottom-up" approach: each observation starts in its own cluster, and pairs of clusters are merged as one moves up the hierarchy.
+Divisive: This is a "top-down" approach: all observations start in one cluster, and splits are performed recursively as one moves down the hierarchy."
+(Source:<https://en.wikipedia.org/wiki/Hierarchical_clustering>)
+
+
+"Hierarchical clustering constructs trees of clusters of objects, in which any two clusters are disjoint, or one includes the other. The cluster of all objects is the root of the tree. Agglomerative algorithms [...] require a definition of dissimilarity between clusters; the most common ones are maximum or complete linkage, in which the dissimilarity between two clusters is the maximum of all pairs of dissimilarities between pairs of points in the different clusters; minimum or single linkage or nearest neighbor [...] in which the dissimilarity between two clusters is the minimum over all those pairs of dissimilarities; and average linkage in which the dissimilarity between the two clusters is the average, or suitably weighted average, over all those pairs of dissimilarities. Agglomerative algorithms begin with an initial set of singleton clusters consisting of all the objects; proceed by agglomerating the pair of clusters of minimum dissimilarity to obtain a new cluster, removing the two clusters combined from further consideration; and repeat this agglomeration step until a single cluster containing all the observations is obtained. The set of clusters obtained along the way forms a hierarchical clustering."(source: J.A. Hartigan, 2001, "Statistical Clustering",  International Encyclopedia of the Social & Behavioral Sciences,)
+
+
+"If the number of elements to be clustered is represented by n and the number of clusters is represented by k, then the time complexity of hierarchical algorithms is of the order (kn^2)."(source: S.G. Roy, A. Chakrabarti, "A novel graph clustering algorithm based on discrete-time quantum random walk", Quantum Inspired Computational Intelligence, 2017)
+
+
+We will employ the Agglomerative Hierarchical Clustering with complete method to determine the optimum number of clusters. to determine the best number of clusters we use the elbow method and compare it with the silhouette method.
+
+Given the large datasest and our time constraints, for now, for illustrative purposes, we apply the HAC method to a subset of the data available to illustrate the method's criteria for choosing the optimal numbers of clusters and to illustrate approaches for visualizing the outputs.
+
+```{r echo=FALSE, message=FALSE, warnings=FALSE, out.width="100%", fig.fullwidth=TRUE, fig.align='center' }
+#------------ AGGLOMERATIVE CLUSTERING ------------#
+# using complete method
+# Calculate elbow sum-of-squares and silhouette width for many k using Agglomerative Clustering
+#df<-censusdf[,(names(censusdf) %in% INPUT_model_vars[,1])]
+#df[sapply(df, is.character)] <- lapply(df[sapply(df, is.character)], as.factor)
+silhwidth <- c(NA)  #initialize a vector to hold the silhouette widths
+elbsumofsq <- c(NA)  #initialize a vector to hold the elbow sum-of-squares
+clustnum <- c(2:10) #initialize a vector for number of clusters
+set.seed(3)
+ahc_fit <- flashClust(D, method = "ward")
+for(i in clustnum) {
+  #print(i)
+  cluststats <- cluster.stats(d=D, clustering=cutree(ahc_fit, k=i))
+  elbsumofsq[i] <- cluststats$within.cluster.ss
+  silhwidth[i] <- cluststats$avg.silwidth
+}
+# Plot elbow sum-of-squares
+p1 <- ggplot(data = data.frame(x = clustnum, y = elbsumofsq[-1]), 
+  aes(x = x, y = y)) + geom_point()+ geom_line() + ggtitle("Elbow Method") +
+  labs(x = "Num.of clusters", y = "Within Cluster Sum of Squares (wss)") +
+  theme(plot.title = element_text(hjust = 0.5))
+# Plot silhouette widths
+p2 <- ggplot(data = data.frame(x = clustnum, y = silhwidth[-1]), 
+  aes(x = x, y = y)) + geom_point()+ geom_line() + ggtitle("Silhouette Method") +
+  labs(x = "Num.of clusters", y = "Silhouette widths") +
+  theme(plot.title = element_text(hjust = 0.5))
+grid.arrange(p1, p2, nrow=1)
+clusternum <- 3
+ahc_dend <- as.dendrogram(ahc_fit) # create dendrogram object
+plot(color_branches(ahc_dend, k=clusternum),leaflab="none")
+```
+
+Both Elbow and Silhouette method indicated that the optimal number of cluster is 3.  The dendrogram also shows that 3 is the optimum value of k.  Having selected k = 3, let's look at each cluster by doing a summary plots.
+
+#### Visualizing the clusters
+
+Let's visualize the clusters using t-SNE (t-distributed Stochastic Neighbor Embedding).
+
+```{r echo=FALSE, message=FALSE, warnings=FALSE, out.width="100%", fig.fullwidth=TRUE, fig.align='center' }
+ahc_tree <- cutree(ahc_fit, k=clusternum)
+tsne_ahc <- Rtsne(D, is_distance = TRUE)
+tsne_data <- tsne_ahc$Y %>% data.frame() %>% setNames(c("X", "Y")) %>% mutate(cluster = factor(ahc_tree))
+ggplot(aes(x = X, y = Y), data = tsne_data) + geom_point(aes(color = cluster))
+  
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warnings=FALSE, out.width="100%", fig.fullwidth=TRUE, fig.align='center' }
+df1_out_hac<-df1
+df1_out_hac$cluster <- ahc_tree
+  
+print('Clusters analysis')
+for(idx_var in 1:length(INPUT_model_vars[,1]))
+{ df1_out_hac$VAR_TGT<-df1_out_hac[,INPUT_model_vars[idx_var,1]]
+  p1 <- ggplot(df1_out_hac, aes(x=VAR_TGT)) + geom_bar(aes(fill=as.factor(cluster)), width = 0.5)+
+       theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(size=8), plot.title = element_text(size=9))+ 
+       labs( fill="Cluster", y="Number of persons",x=INPUT_model_vars[idx_var,2], title=paste0("No. of persons by Cluster and ",INPUT_model_vars[idx_var,2]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+p11 <- ggplot(df1_out_hac, aes(x=VAR_TGT, fill = as.factor(cluster))) +
+        geom_bar(position = "fill", width = 0.5) +
+        stat_count(position=position_fill(vjust=0.5))+
+        theme(axis.text.x=element_text(angle=90, vjust=0.5),text = element_text(size=8), plot.title = element_text(size=9))+ 
+        scale_y_continuous(labels=scales::percent)+
+        labs(fill="Cluster", x=INPUT_model_vars[idx_var,2], title=paste0("Cluster distribution by ", INPUT_model_vars[idx_var,2]))+
+        scale_fill_manual(values =INPUT_colors_categories)
+grid.arrange( p1, p11, ncol = 2)
+  
+}
+```
+
+
+#### Agglomerative Hierarchical Cluster Observations
+
+Cluster 1:  Mostly composed of highly educated, middle aged, married female.  Mostly are Professional and/or in Management, Business, Financial or Office administration.   A higher percentage of cluster 1 are mid-income.  But it should be noted that more than 50% of 1M+ earners are members of Cluster 1.
+
+Cluster 2:  Mostly composed of skilled and highly educated, middle aged and older Male who are working in various occupation.  A bigger percentage are working in Construction, Installation, Maintenance, Repair and Transportation. A high percentage of Cluster 2 members earn 70K and higher, up to 1M+.
+
+Cluster 3:  This cluster is divided between Male and Female.  A high percentage of the members are young, single/divorced and widowed.  A higher percentage has an Associate Degree and less.   A higher percentage are mid-income to low income but a few earns as high as 1M+.
+
+
+
+## Ethics points
+
+The US census data covers a set of personal characteristics such as gender, as well as racial and cultural minorities.
+
+One can observe in the data that certain categories can have significantly different profile with respect to income and education.
+
+As such, if data were used in customer segmentation based on income and education, particular attention should be given to avoid unethical systematic adverse selection of certain groups. 
+
+
+# Model Deployment
+
+The model and the shiny app developed in this project can be useful to the retail bank in that it provides insight into the structure of census data, and it may be suitable for grouping potential customers into clusters that can be designated to certain types of credit card offers. 
+
+The results of the three applied clustering methods are to some extent different. Whereas the optimum number of clusters for k-means and k-medoids were four, the optimum number of clusters for hierarchical clustering was three. Based on the t-SNE visualization of the results, hierarchical clustering seems to be able to discriminate clusters to the largest extent. Considering the differences of the results, the uncertainty associated with the grouping of the instances into clusters, and the potential ethical issues involved, the retail bank may carefully consider how these results may be used for their purposes.
+
+K-means was implemented into the shiny app for two reasons: 
+  (i)     it is not computationally intensive
+  (ii)    the clustering obtained is reasonable and aligned with the credit card concept and with what we observed in the data
+
+The shiny app associated with our model illustrates how a new, potential customer may fit into one of the clusters, and how far the distance is between this customer and the other clusters. Furthermore, the app visualizes how each of the individual clusters is characterized, and what are the most distinguishing factors.
+
+If time would allow it, the model(s) could be further improved. For example, the clustering methods could be fine-tuned by implementing more feature engineering. Also, computationally more intensive methods such as t-SNE could be modified by applying a different dimensionality reduction method prior to applying t-SNE. Lastly, different features from the publicly available census dataset could be included and tested in terms of improving cluster generation.
+
+Link to the shiny app: <https://robin-mathew.shinyapps.io/CustomerSegmentationProject/>.  Please allow 10 to 15 seconds to load.
+
+## References
+
+Mensah Yaw M., Hsiao-Yin Chen, 2013,"Global Clustering of Countries by Culture – An Extension of the GLOBE Study" <https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2189904>
+
+
+Kohav Ron , 1996, "Scaling Up the Accuracy of Naive-Bayes Classifiers: a Decision-Tree Hybrid", Proceedings of the Second International Conference on Knowledge Discovery and Data Mining, 
+
+Kaufman, Leonard, and Peter Rousseeuw. 1990. Finding Groups in Data: An Introduction to Cluster Analysis.
