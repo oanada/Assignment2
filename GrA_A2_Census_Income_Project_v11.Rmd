@@ -112,8 +112,8 @@ library(data.table)
 mainPalette = brewer.pal(20,"YlGnBu")
 ### read files
 # pls. download locally the csv from  https://github.com/oanada/Assignment2/blob/main/US_Census_2020.csv
-INPUT_file_path="US_Census_2020.csv"
-#INPUT_file_path="https://raw.githubusercontent.com/oanada/Assignment2/main/US_Census_2020.csv"
+#INPUT_file_path="US_Census_2020.csv"
+INPUT_file_path="https://raw.githubusercontent.com/oanada/Assignment2/main/US_Census_2020.csv"
 censusdf<-read.csv(INPUT_file_path, header = TRUE) 
 censusdf$region_state<-paste(censusdf$region,censusdf$state)
 censusdf$workclass_occupation <-paste(censusdf$occupation,censusdf$workclass)
