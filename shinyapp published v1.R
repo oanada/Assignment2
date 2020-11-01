@@ -15,7 +15,7 @@ ui <- fluidPage(theme = shinytheme("cerulean"),
                            sidebarLayout(
                            sidebarPanel(
                              tags$h4("Customer Profile:"),
-                             selectInput(inputId = "var1", label = "curently Enrolled", choices = ""),
+                             selectInput(inputId = "var1", label = "Currently Enrolled", choices = ""),
                              selectInput(inputId = "var2", label = "Gender", choices = ""),
                              selectInput(inputId = "var3", label = "Occupation", choices = ""),
                              selectInput(inputId = "var4", label = "WorkClass", choices = ""),
